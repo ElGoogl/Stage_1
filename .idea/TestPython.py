@@ -1,1 +1,1 @@
-print("Hello World")
+print("Du darfst nicht hier sein! :(")
