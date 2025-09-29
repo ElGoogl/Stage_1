@@ -1,16 +1,15 @@
+import re
 import os
 import json
-import re
 from collections import defaultdict
+import nltk
+from nltk.corpus import stopwords
 
 RAW_DIR = "data_repository/raw"
 INDEX_DIR = "data_repository/indexed"
 
-STOPWORDS = {
-    "the", "and", "is", "in", "to", "of", "a", "that", "it", "on", "for",
-    "with", "as", "was", "were", "at", "by", "an", "be", "this", "which",
-    "or", "from", "but", "not", "are", "have", "had", "has"
-}
+nltk.download("stopwords")
+STOPWORDS = set(stopwords.words("english"))
 
 
 def tokenize(text: str):
