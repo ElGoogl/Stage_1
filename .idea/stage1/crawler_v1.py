@@ -3,7 +3,7 @@ import requests
 import json
 
 BASE_URL = "https://www.gutenberg.org/cache/epub/{id}/pg{id}.txt"
-DATA_DIR = "data_repository/raw"
+DATA_DIR = "data_repository/raw_v1"
 
 
 def parse_gutenberg_text(text: str, book_id: int) -> dict:
