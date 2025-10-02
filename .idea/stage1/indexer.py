@@ -8,7 +8,11 @@ from nltk.corpus import stopwords
 RAW_DIR = "data_repository/raw"
 INDEX_DIR = "data_repository/indexed"
 
-nltk.download("stopwords")
+try:
+    STOPWORDS = set(stopwords.words("english"))
+except LookupError:
+    nltk.download("stopwords")
+    STOPWORDS = set(stopwords.words("english"))
 STOPWORDS = set(stopwords.words("english"))
 
 
