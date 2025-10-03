@@ -3,7 +3,7 @@ import requests
 import json
 
 BASE_URL = "https://www.gutenberg.org/cache/epub/{id}/pg{id}.txt"
-DATA_DIR = "data_repository/raw"
+DATA_DIR = "data_repository/raw_v1"
 
 
 def parse_gutenberg_text(text: str, book_id: int) -> dict:
@@ -27,6 +27,8 @@ def parse_gutenberg_text(text: str, book_id: int) -> dict:
         if line.startswith("*** START OF THE PROJECT GUTENBERG EBOOK"):
             in_content = True
             continue
+        if line.startswith("*** END OF THE PROJECT GUTENBERG EBOOK"):
+            break
         if not in_content:
             if line.startswith("Title:"):
                 metadata["title"] = line.replace("Title:", "").strip()
@@ -48,7 +50,7 @@ def parse_gutenberg_text(text: str, book_id: int) -> dict:
 
 
 def download_book(book_id: int):
-    """Download book, parse metadata and save as JSON."""
+    """Download book, parse metadata and save as JSON files"""
     url = BASE_URL.format(id=book_id)
     response = requests.get(url)
 
