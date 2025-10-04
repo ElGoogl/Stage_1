@@ -13,7 +13,7 @@ if __name__ == "__main__":
         print(f"--- Iteration {i+1}/5 ---")
         control_pipeline_step()
 
-        # Pause to the access to Gutenberg aren't too fast and our IP gets blocked lol
+        # Pause so the accesses to Gutenberg aren't too fast and our IP gets blocked lol
         time.sleep(2)
 
     print("\nControl Panel test finished.")
