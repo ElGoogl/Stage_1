@@ -1,4 +1,4 @@
-from crawler_v1 import download_book
+from crawler_v1 import download_book_v1
 from crawler_v2 import download_book_v2
 from indexer import build_inverted_index, save_index
 
@@ -8,7 +8,7 @@ if __name__ == "__main__":
 
     # Crawler v1 thats creates the Datalake v1 with Metadata + content JSON files
     for book_id in book_ids:
-        download_book(book_id)
+        download_book_v1(book_id)
 
     index = build_inverted_index()
     save_index(index)
