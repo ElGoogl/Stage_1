@@ -6,7 +6,7 @@ import nltk
 from nltk.corpus import stopwords
 
 RAW_DIR = "data_repository/raw_v1"
-INDEX_DIR = "data_repository/indexed"
+INDEX_DIR = "data_repository/datamart_indexer_v1"
 
 try:
     STOPWORDS = set(stopwords.words("english"))
