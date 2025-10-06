@@ -5,7 +5,7 @@ from collections import defaultdict
 import nltk
 from nltk.corpus import stopwords
 
-RAW_DIR = "data_repository/raw_v1"
+RAW_DIR = "data_repository/datalake_v1"
 INDEX_DIR = "data_repository/datamart_indexer_v1"
 
 try:
