@@ -7,14 +7,16 @@ from queue import Queue, Empty
 from pathlib import Path
 from typing import Iterable, Optional, Set, Sequence
 
-from crawler_v2 import download_book_v2
+from crawler_v2 import download_book_v2, get_subfolder
 from Hierarchical_Indext import index_book_incremental
+from metadata_sqlite import parse_gutenberg_metadata, store_metadata_in_db, create_metadata_table, get_metadata_from_db
 
 # Ordner + State-Dateien
 CONTROL_PATH = Path("control")
 CONTROL_PATH.mkdir(parents=True, exist_ok=True)
 DOWNLOADED_FILE = CONTROL_PATH / "downloaded_books.txt"
 INDEXED_FILE    = CONTROL_PATH / "indexed_books.txt"
+METADATA_FILE   = CONTROL_PATH / "metadata_stored_books.txt"
 
 TOTAL_BOOKS = 80000  # obere Schranke für Random-IDs
 
@@ -34,11 +36,11 @@ def _append_id(path: Path, book_id: int | str) -> None:
 class ControlPanelV2:
     """
     Pipeline:
-      Downloader-Thread -> Queue[book_id] -> Indexer-Thread
+      Downloader-Thread -> Queue[book_id] -> Indexer-Thread (+ Metadata Storage)
 
     - Lädt pro Run 'batch_size' Bücher (zufällige IDs ODER 'fixed_book_ids').
     - Nach erfolgreichem Download: sofort in DOWNLOADED_FILE + Queue.
-    - Indexer verarbeitet Queue inkrementell und pflegt INDEXED_FILE.
+    - Indexer verarbeitet Queue inkrementell, pflegt INDEXED_FILE und speichert Metadata.
     """
 
     def __init__(self,
@@ -56,11 +58,15 @@ class ControlPanelV2:
         # State laden
         self.downloaded_ids: Set[str] = _load_ids(DOWNLOADED_FILE)
         self.indexed_ids: Set[str]    = _load_ids(INDEXED_FILE)
+        self.metadata_ids: Set[str]   = _load_ids(METADATA_FILE)
 
         # Thread-Steuerung
         self._stop = threading.Event()
         self._producer = threading.Thread(target=self._run_producer, name="Downloader", daemon=True)
         self._consumer = threading.Thread(target=self._run_consumer, name="Indexer", daemon=True)
+
+        # Initialize metadata database
+        create_metadata_table()
 
     # ---------- Lifecycle ----------
 
@@ -150,20 +156,75 @@ class ControlPanelV2:
                 break
 
             book_id = int(item)
-            if str(book_id) in self.indexed_ids:
-                print(f"[Indexer] → {book_id} ist bereits indexiert, überspringe.")
+            book_id_str = str(book_id)
+            
+            # Check if already processed
+            already_indexed = book_id_str in self.indexed_ids
+            already_metadata = book_id_str in self.metadata_ids
+            
+            if already_indexed and already_metadata:
+                print(f"[Indexer] → {book_id} ist bereits vollständig verarbeitet, überspringe.")
                 self.q.task_done()
                 continue
 
-            print(f"[Indexer] → Indexing {book_id} (incremental)")
-            try:
-                index_book_incremental(book_id)
-                _append_id(INDEXED_FILE, book_id)
-                self.indexed_ids.add(str(book_id))
-                print(f"[Indexer] ✓ Indexed {book_id}")
-            except Exception as e:
-                print(f"[Indexer] ✗ Indexing error for {book_id}: {e}")
-            finally:
-                self.q.task_done()
+            # Indexing
+            if not already_indexed:
+                print(f"[Indexer] → Indexing {book_id} (incremental)")
+                try:
+                    index_book_incremental(book_id)
+                    _append_id(INDEXED_FILE, book_id)
+                    self.indexed_ids.add(book_id_str)
+                    print(f"[Indexer] ✓ Indexed {book_id}")
+                except Exception as e:
+                    print(f"[Indexer] ✗ Indexing error for {book_id}: {e}")
+
+            # Metadata extraction and storage
+            if not already_metadata:
+                print(f"[Indexer] → Extracting metadata for {book_id}")
+                try:
+                    # Get the header file path
+                    subfolder = get_subfolder(book_id)
+                    header_path = subfolder / f"{book_id}_header.txt"
+                    
+                    if header_path.exists():
+                        # Read and parse header
+                        header_content = header_path.read_text(encoding="utf-8")
+                        metadata_dict = parse_gutenberg_metadata(header_content)
+                        
+                        if metadata_dict:
+                            # Store in database
+                            success = store_metadata_in_db(metadata_dict, book_id=book_id_str)
+                            if success:
+                                _append_id(METADATA_FILE, book_id)
+                                self.metadata_ids.add(book_id_str)
+                                print(f"[Indexer] ✓ Metadata stored for {book_id}")
+                                
+                                # === DEBUG: Print stored metadata (comment out this section to disable) ===
+                                try:
+                                    retrieved_metadata = get_metadata_from_db(book_id_str)
+                                    if retrieved_metadata:
+                                        print(f"[DEBUG] 📖 Retrieved metadata for book {book_id}:")
+                                        for key, value in retrieved_metadata.items():
+                                            # Truncate long values for readability
+                                            display_value = str(value)[:100] + "..." if len(str(value)) > 100 else str(value)
+                                            print(f"[DEBUG]   {key}: {display_value}")
+                                        print(f"[DEBUG] 📖 End metadata for book {book_id}")
+                                    else:
+                                        print(f"[DEBUG] ⚠️ Could not retrieve metadata for book {book_id}")
+                                except Exception as debug_e:
+                                    print(f"[DEBUG] ✗ Error retrieving metadata for display: {debug_e}")
+                                # === END DEBUG SECTION ===
+                                
+                            else:
+                                print(f"[Indexer] ✗ Failed to store metadata for {book_id}")
+                        else:
+                            print(f"[Indexer] ⚠️ No metadata found in header for {book_id}")
+                    else:
+                        print(f"[Indexer] ⚠️ Header file not found for {book_id}: {header_path}")
+                        
+                except Exception as e:
+                    print(f"[Indexer] ✗ Metadata extraction error for {book_id}: {e}")
+
+            self.q.task_done()
 
         print("[Indexer] Done")
