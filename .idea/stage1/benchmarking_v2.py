@@ -59,11 +59,6 @@ if __name__ == "__main__":
     t, m = benchmark_function(index_book_incremental, TEST_ID, runs=10)  # ← 10
     results.append(("Index v2 (incremental, single ID)", t, m))
 
-    # (Optional) Voll-Rebuild messen – eher „Batch“-Charakter:
-    # _delete_index_dir()
-    # t, m = benchmark_function(build_hierarchical_index, runs=10, clean=True)  # ← 10 falls gewünscht
-    # results.append(("Index v2 (full rebuild)", t, m))
-
     print("\nBenchmark Summary:")
     print(f"{'Component':35} {'Avg Time (s)':>15} {'Avg Memory (MB)':>20}")
     print("-" * 75)
