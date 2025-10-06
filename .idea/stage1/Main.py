@@ -10,7 +10,7 @@ if __name__ == "__main__":
 
     # 5 test runs of the control panel (each run is either one indexing or one download)
     for i in range(5):
-        print(f"--- Iteration {i+1}/5 ---")
+        print(f"--- Control panel iteration {i+1}/5 ---")
         control_pipeline_step()
 
         # Pause so the accesses to Gutenberg aren't too fast and our IP gets blocked lol

@@ -3,7 +3,7 @@ import requests
 from pathlib import Path
 
 BASE_URL = "https://www.gutenberg.org/cache/epub/{id}/pg{id}.txt"
-RAW_V2_DIR = Path("data_repository/raw_v2")
+RAW_V2_DIR = Path("data_repository/datalake_v2")
 
 START_MARKER = "*** START OF THE PROJECT GUTENBERG EBOOK"
 END_MARKER = "*** END OF THE PROJECT GUTENBERG EBOOK"
