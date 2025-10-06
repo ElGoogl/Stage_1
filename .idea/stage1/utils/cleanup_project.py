@@ -2,8 +2,8 @@ import shutil
 from pathlib import Path
 
 # Base paths (adjust if needed)
-DATA_REPO = Path("data_repository")
-CONTROL_PATH = Path("control")
+DATA_REPO = Path("../data_repository")
+CONTROL_PATH = Path("../control")
 
 # directory names
 DATALAKE_V1 = DATA_REPO / "datalake_v1"

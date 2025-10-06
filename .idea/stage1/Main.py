@@ -1,5 +1,5 @@
 from control.control_panel import control_pipeline_step
-from crawler_v2 import download_book_v2
+from crawlers.crawler_v2 import download_book_v2
 import time
 
 
@@ -13,7 +13,7 @@ if __name__ == "__main__":
         print(f"--- Control panel iteration {i+1}/5 ---")
         control_pipeline_step()
 
-        # Pause so the accesses to Gutenberg aren't too fast and our IP gets blocked lol
+        # Pause so the accesses to Gutenberg aren't too fast and our IP gets blocked (again lol)
         time.sleep(2)
 
     print("\nControl Panel test finished.")

@@ -2,9 +2,9 @@ import time
 import statistics
 import csv
 from memory_profiler import memory_usage
-from crawler_v1 import download_book_v1
-from crawler_v2 import download_book_v2
-from indexed_query_v1 import search_file_v1
+from crawlers.crawler_v1 import download_book_v1
+from crawlers.crawler_v2 import download_book_v2
+from indexed_query.indexed_query_v1 import search_file_v1
 
 
 # Generic benchmarking helper
