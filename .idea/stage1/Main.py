@@ -6,7 +6,7 @@ import time
 if __name__ == "__main__":
 
     # Crawler v1 + Indexer v1 launched through the control panel
-    print("Starting Control Panel test (5 iterations)...\n")
+    print("Starting Control Panel (5 iterations)...\n")
 
     # 5 test runs of the control panel (each run is either one indexing or one download)
     for i in range(5):
@@ -16,7 +16,6 @@ if __name__ == "__main__":
         # Pause so the accesses to Gutenberg aren't too fast and our IP gets blocked (again lol)
         time.sleep(2)
 
-    print("\nControl Panel test finished.")
 
     # example book id list for crawler v2
     book_ids = [76921, 76922, 76947, 20345]
