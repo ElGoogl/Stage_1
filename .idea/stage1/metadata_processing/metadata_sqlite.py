@@ -142,3 +142,26 @@ def get_metadata_from_db(book_id, db_path=None):
     except Exception as e:
         print(f"❌ Retrieval error: {e}")
         return None
+
+def search_books(keyword, value, db_path=None):
+    """Search for book IDs by keyword and value."""
+    db_path = db_path or get_db_path()
+    book_ids = []
+    
+    try:
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT book_id, raw_metadata FROM book_metadata WHERE raw_metadata IS NOT NULL')
+            
+            for row in cursor.fetchall():
+                try:
+                    metadata = json.loads(row[1])
+                    if keyword in metadata and value.lower() in str(metadata[keyword]).lower():
+                        book_ids.append(row[0])
+                except:
+                    continue
+                    
+    except Exception as e:
+        print(f"❌ Search error: {e}")
+    
+    return book_ids

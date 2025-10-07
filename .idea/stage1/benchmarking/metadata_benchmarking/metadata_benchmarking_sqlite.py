@@ -16,7 +16,7 @@ def quiet():
 
 # Import from the correct paths
 sys.path.append(str(Path(__file__).parent.parent.parent))
-from metadata_processing.metadata_sqlite import parse_gutenberg_metadata, store_metadata_in_db, get_metadata_from_db, create_metadata_table
+from metadata_processing.metadata_sqlite import parse_gutenberg_metadata, store_metadata_in_db, get_metadata_from_db, create_metadata_table, search_books
 
 def get_books():
     """Get book IDs from V1 JSON files."""
@@ -70,6 +70,38 @@ def benchmark(book_ids, db_path):
         "total_s": sum(times["extract"]) + sum(times["store"]) + sum(times["query"])
     }
 
+def benchmark_search(db_path, num_searches=10):
+    """Benchmark search operations."""
+    search_queries = [
+        ('Author', 'a'),      # Search for authors containing 'a'
+        ('Title', 'the'),     # Search for titles containing 'the'
+        ('Language', 'en'),   # Search for English books
+        ('Subject', 'fiction'), # Search for fiction books
+        ('Author', 'dickens'), # Search for Dickens
+    ]
+    
+    times = []
+    results_count = []
+    
+    for _ in range(num_searches):
+        # Pick a random search query
+        keyword, value = random.choice(search_queries)
+        
+        # Time the search
+        t = time.perf_counter()
+        with quiet():
+            results = search_books(keyword, value, db_path)
+        search_time = time.perf_counter() - t
+        
+        times.append(search_time)
+        results_count.append(len(results))
+    
+    return {
+        "avg_search_ms": statistics.mean(times) * 1000 if times else 0,
+        "avg_results": statistics.mean(results_count) if results_count else 0,
+        "total_searches": len(times)
+    }
+
 def test():
     """Test V1 JSON format with 5 runs and average results."""
     books = get_books()
@@ -78,10 +110,10 @@ def test():
         return
         
     print(f"\nV1 (JSON) - 5 Runs Average")
-    print("=" * 55)
+    print("=" * 70)
     print(f"Books: {len(books)}, Testing: {[s for s in [10,25,50,75,100] if s <= len(books)]}")
-    print("Size     Success%   Extract    Store      Query      Total")
-    print("-" * 55)
+    print("Size     Success%   Extract    Store      Query      Search     Total")
+    print("-" * 70)
     
     temp_dir = tempfile.mkdtemp(prefix="bench_v1_")
     try:
@@ -94,7 +126,13 @@ def test():
                 db_path = Path(temp_dir) / f"{size}_run_{run}.db"
                 with quiet(): create_metadata_table(str(db_path))
                 
+                # Run standard benchmark
                 results = benchmark(sample_books, str(db_path))
+                
+                # Run search benchmark on the populated database
+                search_results = benchmark_search(str(db_path), num_searches=5)
+                results["search_ms"] = search_results["avg_search_ms"]
+                
                 all_results.append(results)
             
             # Calculate averages
@@ -103,12 +141,13 @@ def test():
                 "extract_ms": statistics.mean([r["extract_ms"] for r in all_results]),
                 "store_ms": statistics.mean([r["store_ms"] for r in all_results]),
                 "query_ms": statistics.mean([r["query_ms"] for r in all_results]),
+                "search_ms": statistics.mean([r["search_ms"] for r in all_results]),
                 "total_s": statistics.mean([r["total_s"] for r in all_results])
             }
             
             print(f"{size:<8} {avg_results['success_rate']:<10.1%} "
                   f"{avg_results['extract_ms']:<10.2f} {avg_results['store_ms']:<10.2f} "
-                  f"{avg_results['query_ms']:<10.2f} {avg_results['total_s']:<8.2f}")
+                  f"{avg_results['query_ms']:<10.2f} {avg_results['search_ms']:<10.2f} {avg_results['total_s']:<8.2f}")
     finally:
         shutil.rmtree(temp_dir)
 
