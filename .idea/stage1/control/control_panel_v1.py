@@ -2,7 +2,7 @@ from pathlib import Path
 import random
 import json
 from crawler_v1 import download_book_v1
-from JSON_Indexer.indexer import build_inverted_index, save_index
+from JSON_Indexer.indexer import build_inverted_index, save_index, index_book_incremental
 from metadata_sqlite import parse_gutenberg_metadata, store_metadata_in_db, create_metadata_table, get_metadata_from_db
 
 # Paths for tracking state - V1 uses crawler_v1 and indexer_v1
@@ -54,12 +54,14 @@ def control_pipeline_step():
         book_id = ready_to_index.pop()
         print(f"[CONTROL] Scheduling book {book_id} for indexing...")
 
-        # Run the indexer (this builds the index for all downloaded files)
-        index = build_inverted_index()
-        save_index(index)
-
-        save_state(INDEXINGS, book_id)
-        print(f"[CONTROL] Book {book_id} indexed successfully.")
+        # Run incremental JSON indexing (only processes this specific book)
+        try:
+            index_book_incremental(book_id)
+            save_state(INDEXINGS, book_id)
+            print(f"[CONTROL] Book {book_id} indexed successfully (incremental).")
+        except Exception as e:
+            print(f"[CONTROL] Indexing failed for book {book_id}: {e}")
+            return  # Skip metadata extraction if indexing failed
         
         # Also extract and store metadata if not already done
         if book_id in ready_for_metadata:
