@@ -9,7 +9,7 @@ from metadata_sqlite import parse_gutenberg_metadata, store_metadata_in_db, crea
 CONTROL_PATH = Path("control")
 DOWNLOADS = CONTROL_PATH / "v1_crawler_books.txt"      # V1 crawler progress
 INDEXINGS = CONTROL_PATH / "v1_indexer_books.txt"      # V1 indexer progress
-METADATA_STORED = CONTROL_PATH / "metadata_stored_books.txt"  # Shared metadata file
+METADATA_STORED = CONTROL_PATH / "v1_metadata_books.txt"  # V1 metadata file
 
 # Total range of available book IDs (Project Gutenberg goes up to ~70,000+)
 TOTAL_BOOKS = 80000
