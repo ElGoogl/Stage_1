@@ -1,5 +1,4 @@
 import mysql.connector
-import json
 import re
 
 DEBUG = False
@@ -14,6 +13,13 @@ DB_CONFIG = {
 def get_connection():
     conn = mysql.connector.connect(**DB_CONFIG)
     return conn
+
+
+def sanitize_column_name(field_name):
+    """Convert field name to valid MySQL column name."""
+    sanitized = re.sub(r'[^a-zA-Z0-9_]', '_', field_name.lower())
+    sanitized = re.sub(r'_+', '_', sanitized)
+    return sanitized.strip('_') or 'unknown_field'
 
 
 def parse_gutenberg_metadata(text_content):
@@ -83,16 +89,16 @@ def create_metadata_table():
                 loc_class TEXT,
                 category TEXT,
                 ebook_no TEXT,
-                raw_metadata JSON,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
         
         conn.commit()
         conn.close()
+        print("✅ Metadata table created/verified")
 
     except Exception as e:
-        print(f"Error creating table: {e}")
+        print(f"❌ Error creating table: {e}")
 
 
 def store_metadata_in_db(metadata_dict, book_id=None):
@@ -103,11 +109,6 @@ def store_metadata_in_db(metadata_dict, book_id=None):
 
         cursor.execute("SHOW COLUMNS FROM book_metadata")
         existing_columns = {row[0].lower() for row in cursor.fetchall()}
-
-        def sanitize_column_name(field_name):
-            sanitized = re.sub(r'[^a-zA-Z0-9_]', '_', field_name.lower())
-            sanitized = re.sub(r'_+', '_', sanitized)
-            return sanitized.strip('_') or 'unknown_field'
 
         new_columns = []
         for field_name in metadata_dict.keys():
@@ -125,7 +126,6 @@ def store_metadata_in_db(metadata_dict, book_id=None):
         data = {'book_id': book_id or metadata_dict.get('Title') or f"unknown_{hash(str(metadata_dict))}"}
         for field_name, field_value in metadata_dict.items():
             data[sanitize_column_name(field_name)] = field_value
-        data['raw_metadata'] = json.dumps(metadata_dict)
 
         columns = list(data.keys())
         placeholders = ', '.join(['%s'] * len(columns))
@@ -143,11 +143,11 @@ def store_metadata_in_db(metadata_dict, book_id=None):
         conn.commit()
         conn.close()
 
-        if DEBUG:
-            msg = f"Stored metadata for: {data.get('title') or data['book_id']}"
-            if new_columns:
-                msg += f" (added {len(new_columns)} new columns)"
-            print(msg)
+        title = data.get('title') or data['book_id']
+        msg = f"✅ Stored metadata for: {title}"
+        if new_columns:
+            msg += f" (added {len(new_columns)} new columns)"
+        print(msg)
         return True
 
     except Exception as e:
@@ -156,39 +156,71 @@ def store_metadata_in_db(metadata_dict, book_id=None):
 
 
 def get_metadata_from_db(book_id):
+    """Retrieve metadata for a book from database using structured columns."""
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT raw_metadata FROM book_metadata WHERE book_id = %s", (book_id,))
+        
+        # Get all columns except system columns
+        cursor.execute("SHOW COLUMNS FROM book_metadata")
+        columns = [row[0] for row in cursor.fetchall() 
+                  if row[0] not in ['id', 'book_id', 'raw_metadata', 'created_at']]
+        
+        if not columns:
+            conn.close()
+            return None
+            
+        # Build dynamic query for all metadata columns
+        cols_str = ', '.join(columns)
+        cursor.execute(f'SELECT {cols_str} FROM book_metadata WHERE book_id = %s', (book_id,))
         result = cursor.fetchone()
         conn.close()
-        if result:
-            return json.loads(result[0])
-        return None
+        
+        if not result:
+            return None
+            
+        # Reconstruct metadata dictionary
+        metadata = {}
+        for i, col in enumerate(columns):
+            if result[i] is not None:
+                # Convert column name back to original field name
+                original_field = col.replace('_', ' ').title()
+                metadata[original_field] = result[i]
+                
+        return metadata if metadata else None
+        
     except Exception as e:
-        print(f"Error retrieving metadata: {e}")
+        print(f"❌ Retrieval error: {e}")
         return None
 
 def search_books(keyword, value):
+    """Search for book IDs by keyword and value using structured columns."""
     book_ids = []
+    
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT book_id, raw_metadata FROM book_metadata WHERE raw_metadata IS NOT NULL")
-        rows = cursor.fetchall()
+        
+        # Convert keyword to column name
+        column_name = sanitize_column_name(keyword)
+        
+        # Check if column exists
+        cursor.execute("SHOW COLUMNS FROM book_metadata")
+        existing_columns = {row[0].lower() for row in cursor.fetchall()}
+        
+        if column_name in existing_columns:
+            # Direct SQL search on the specific column
+            sql = f"SELECT book_id FROM book_metadata WHERE {column_name} LIKE %s AND {column_name} IS NOT NULL"
+            cursor.execute(sql, (f'%{value}%',))
+            book_ids = [row[0] for row in cursor.fetchall()]
+        else:
+            print(f"⚠️ Column '{column_name}' (from keyword '{keyword}') not found in database")
+        
         conn.close()
-
-        for book_id, raw in rows:
-            try:
-                metadata = json.loads(raw)
-                if keyword in metadata and value.lower() in str(metadata[keyword]).lower():
-                    book_ids.append(book_id)
-            except Exception:
-                continue
-
+                
     except Exception as e:
-        print(f"Search error: {e}")
-
+        print(f"❌ Search error: {e}")
+    
     return book_ids
 
 

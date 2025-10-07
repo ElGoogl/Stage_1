@@ -76,7 +76,7 @@ def create_metadata_table(db_path=None):
                 book_id TEXT UNIQUE,
                 title TEXT, author TEXT, release_date TEXT, language TEXT,
                 credits TEXT, subject TEXT, loc_class TEXT, category TEXT,
-                ebook_no TEXT, raw_metadata TEXT,
+                ebook_no TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )''')
         print(f"✅ Metadata table created/verified in {db_path}")
@@ -112,7 +112,6 @@ def store_metadata_in_db(metadata, db_path=None, book_id=None):
             data = {'book_id': book_id or metadata.get('Title') or f"unknown_{hash(str(metadata))}"}
             for field, value in metadata.items():
                 data[sanitize_column(field)] = value
-            data['raw_metadata'] = json.dumps(metadata)
             
             # Insert data
             cols = list(data.keys())
@@ -131,35 +130,65 @@ def store_metadata_in_db(metadata, db_path=None, book_id=None):
         return False
 
 def get_metadata_from_db(book_id, db_path=None):
-    """Retrieve metadata for a book from database."""
+    """Retrieve metadata for a book from database using structured columns."""
     db_path = db_path or get_db_path()
     try:
         with sqlite3.connect(db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute('SELECT raw_metadata FROM book_metadata WHERE book_id = ?', (book_id,))
+            
+            # Get all columns except system columns
+            cursor.execute("PRAGMA table_info(book_metadata)")
+            columns = [row[1] for row in cursor.fetchall() 
+                      if row[1] not in ['id', 'book_id', 'raw_metadata', 'created_at']]
+            
+            if not columns:
+                return None
+                
+            # Build dynamic query for all metadata columns
+            cols_str = ', '.join(columns)
+            cursor.execute(f'SELECT {cols_str} FROM book_metadata WHERE book_id = ?', (book_id,))
             result = cursor.fetchone()
-            return json.loads(result[0]) if result else None
+            
+            if not result:
+                return None
+                
+            # Reconstruct metadata dictionary
+            metadata = {}
+            for i, col in enumerate(columns):
+                if result[i] is not None:
+                    # Convert column name back to original field name
+                    original_field = col.replace('_', ' ').title()
+                    metadata[original_field] = result[i]
+                    
+            return metadata if metadata else None
+            
     except Exception as e:
         print(f"❌ Retrieval error: {e}")
         return None
 
 def search_books(keyword, value, db_path=None):
-    """Search for book IDs by keyword and value."""
+    """Search for book IDs by keyword and value using structured columns."""
     db_path = db_path or get_db_path()
     book_ids = []
     
     try:
         with sqlite3.connect(db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute('SELECT book_id, raw_metadata FROM book_metadata WHERE raw_metadata IS NOT NULL')
             
-            for row in cursor.fetchall():
-                try:
-                    metadata = json.loads(row[1])
-                    if keyword in metadata and value.lower() in str(metadata[keyword]).lower():
-                        book_ids.append(row[0])
-                except:
-                    continue
+            # Convert keyword to column name
+            column_name = sanitize_column(keyword)
+            
+            # Check if column exists
+            cursor.execute("PRAGMA table_info(book_metadata)")
+            existing_columns = {row[1].lower() for row in cursor.fetchall()}
+            
+            if column_name in existing_columns:
+                # Direct SQL search on the specific column
+                sql = f"SELECT book_id FROM book_metadata WHERE {column_name} LIKE ? AND {column_name} IS NOT NULL"
+                cursor.execute(sql, (f'%{value}%',))
+                book_ids = [row[0] for row in cursor.fetchall()]
+            else:
+                print(f"⚠️ Column '{column_name}' (from keyword '{keyword}') not found in database")
                     
     except Exception as e:
         print(f"❌ Search error: {e}")
