@@ -1,7 +1,7 @@
 from pathlib import Path
 import random
-from crawler_v1 import download_book_v1
-from indexer import build_inverted_index, save_index
+from crawlers.crawler_v1 import download_book_v1
+from indexers.indexer import build_inverted_index, save_index
 
 # Paths for tracking state
 CONTROL_PATH = Path("control")
