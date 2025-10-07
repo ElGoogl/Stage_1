@@ -53,14 +53,14 @@ def benchmark(book_ids, db_path):
         # Store
         t = time.perf_counter()
         with quiet():
-            success = store_metadata_in_db(metadata, db_path=db_path, book_id=str(book_id))
+            success = store_metadata_in_db(metadata, book_id=str(book_id))
         times["store"].append(time.perf_counter() - t)
         
         if success:
             successful += 1
             # Query
             t = time.perf_counter()
-            get_metadata_from_db(str(book_id), db_path=db_path)
+            get_metadata_from_db(str(book_id))
             times["query"].append(time.perf_counter() - t)
     
     return {
@@ -91,7 +91,7 @@ def benchmark_search(db_path, num_searches=10):
         # Time the search
         t = time.perf_counter()
         with quiet():
-            results = search_books(keyword, value, db_path)
+            results = search_books(keyword, value)
         search_time = time.perf_counter() - t
         
         times.append(search_time)
@@ -125,7 +125,7 @@ def test():
             
             for run in range(5):
                 db_path = Path(temp_dir) / f"{size}_run_{run}.db"
-                with quiet(): create_metadata_table(str(db_path))
+                with quiet(): create_metadata_table()
                 
                 # Run standard benchmark
                 results = benchmark(sample_books, str(db_path))
