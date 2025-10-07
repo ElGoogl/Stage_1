@@ -1,0 +1,7 @@
+SizeLabel,Metric,Total Time (s),Average Time (s),Average Memory (MB),SuccDownloads,Indexed,Sleep Total (s)
+70000-70009 (n=10),Download (all),6.301022,0.900146,64.39,7,7,2.055
+70000-70009 (n=10),Index (all),2.794139,0.399163,72.65,7,7,0.000
+70000-70009 (n=10),Search – advantage (20 runs),0.009273,0.000464,73.39,7,7,0.000
+70000-70009 (n=10),Search – house (20 runs),0.005590,0.000279,73.39,7,7,0.000
+70000-70009 (n=10),Search – white (20 runs),0.004763,0.000238,73.39,7,7,0.000
+70000-70009 (n=10),Search – overall (all runs),0.019625,0.000327,73.39,7,7,0.000
