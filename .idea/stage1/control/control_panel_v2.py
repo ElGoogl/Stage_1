@@ -14,9 +14,11 @@ from metadata_sqlite import parse_gutenberg_metadata, store_metadata_in_db, crea
 # Ordner + State-Dateien
 CONTROL_PATH = Path("control")
 CONTROL_PATH.mkdir(parents=True, exist_ok=True)
-DOWNLOADED_FILE = CONTROL_PATH / "downloaded_books.txt"
-INDEXED_FILE    = CONTROL_PATH / "indexed_books.txt"
-METADATA_FILE   = CONTROL_PATH / "metadata_stored_books.txt"
+
+# Separate tracking files for crawler and indexer components
+DOWNLOADED_FILE = CONTROL_PATH / "v2_crawler_books.txt"    # V2 crawler progress  
+INDEXED_FILE    = CONTROL_PATH / "v2_indexer_books.txt"    # V2 indexer progress
+METADATA_FILE   = CONTROL_PATH / "metadata_stored_books.txt"  # Shared metadata file
 
 TOTAL_BOOKS = 80000  # obere Schranke für Random-IDs
 

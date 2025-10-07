@@ -5,11 +5,11 @@ from crawler_v1 import download_book_v1
 from JSON_Indexer.indexer import build_inverted_index, save_index
 from metadata_sqlite import parse_gutenberg_metadata, store_metadata_in_db, create_metadata_table, get_metadata_from_db
 
-# Paths for tracking state
+# Paths for tracking state - V1 uses crawler_v1 and indexer_v1
 CONTROL_PATH = Path("control")
-DOWNLOADS = CONTROL_PATH / "downloaded_books.txt"
-INDEXINGS = CONTROL_PATH / "indexed_books.txt"
-METADATA_STORED = CONTROL_PATH / "metadata_stored_books.txt"
+DOWNLOADS = CONTROL_PATH / "v1_crawler_books.txt"      # V1 crawler progress
+INDEXINGS = CONTROL_PATH / "v1_indexer_books.txt"      # V1 indexer progress
+METADATA_STORED = CONTROL_PATH / "metadata_stored_books.txt"  # Shared metadata file
 
 # Total range of available book IDs (Project Gutenberg goes up to ~70,000+)
 TOTAL_BOOKS = 80000
