@@ -2,6 +2,7 @@
 import os
 import csv
 import time
+import random
 import statistics
 from pathlib import Path
 from typing import List, Dict
@@ -20,7 +21,11 @@ ID_START = 70000
 END_IDS = [70009, 70024, 70049, 70074, 70099]
 
 TERMS = ["advantage", "house", "white"]
-DOWNLOAD_THROTTLE_SEC = 0.20   # 0.0 = schnelle Läufe
+
+# Throttle zwischen Downloads (zur Server-Schonung); wird NICHT in Zeiten eingerechnet
+DOWNLOAD_THROTTLE_SEC = 0.20      # 0.0 = ohne Pause
+DOWNLOAD_THROTTLE_JITTER_PCT = 0.2  # ±20% Zufallsjitter auf die Pause
+
 SEARCH_RUNS_PER_TERM  = 20     # 20 Kaltruns je Wort
 CSV_PATH = Path("stage1_benchmark_results.csv")
 
@@ -43,26 +48,30 @@ def _delete_index_dir():
             pass
 
 
-def _download_range_only(start_id: int, end_id: int, throttle: float = 0.25):
+def _download_range_only(start_id: int, end_id: int, throttle: float = 0.25, jitter_pct: float = 0.2):
     """
     Lädt alle Bücher in [start_id, end_id].
     Rückgabe:
       - ok_ids: Liste erfolgreich geladener IDs
-      - per_book_times: Zeit pro erfolgreiches Buch (Sek.)
-      - per_book_mems: Peak-Memory pro erfolgreiches Buch (MB)
-      - wall_total: gesamte Wandzeit inkl. throttle (Sek.)
+      - per_book_times: Zeit pro erfolgreiches Buch (Sek., EXKL. Pausen)
+      - per_book_mems:  Peak-Memory pro erfolgreiches Buch (MB)
+      - sleep_total:    Summe aller Pausen (Sek.) – nur Info, NICHT in Zeiten enthalten
+    Hinweis:
+      - Die Download-Gesamtzeit für die Benchmark-Ergebnisse berechnet sich als sum(per_book_times).
+      - Ggf. angewandte Pausen (throttle + jitter) werden separat als sleep_total geliefert.
     """
     ok_ids: List[int] = []
     per_book_times: List[float] = []
     per_book_mems: List[float] = []
-    wall_start = time.perf_counter()
+    sleep_total: float = 0.0
 
     for bid in range(int(start_id), int(end_id) + 1):
+        # reine Arbeitszeit messen (ohne Pause)
         t0 = time.perf_counter()
         ok = download_book_v2(bid)
         dt = time.perf_counter() - t0
 
-        # Leichtgewichtige Peak-Memory-Schätzung (Sample)
+        # leichtgewichtige Peak-Memory-Schätzung (Sample)
         mem_samples = memory_usage(max_iterations=1)
         pm = max(mem_samples) if mem_samples else 0.0
 
@@ -71,11 +80,15 @@ def _download_range_only(start_id: int, end_id: int, throttle: float = 0.25):
             per_book_times.append(dt)
             per_book_mems.append(pm)
 
+        # optionale Pause – wird aus den Ergebnissen EXKLUDIERT
         if throttle > 0:
-            time.sleep(throttle)
+            # Jitter um Burst-Muster zu vermeiden
+            jitter = 1.0 + random.uniform(-jitter_pct, jitter_pct)
+            pause = max(0.0, throttle * jitter)
+            time.sleep(pause)
+            sleep_total += pause
 
-    wall_total = time.perf_counter() - wall_start
-    return ok_ids, per_book_times, per_book_mems, wall_total
+    return ok_ids, per_book_times, per_book_mems, sleep_total
 
 
 def _index_ids(ids, verbose_missing: bool = False):
@@ -165,7 +178,7 @@ if __name__ == "__main__":
     # CSV vorbereiten (überschreiben)
     with open(CSV_PATH, "w", newline="", encoding="utf-8") as fcsv:
         writer = csv.writer(fcsv)
-        writer.writerow(["SizeLabel", "Metric", "Total Time (s)", "Average Time (s)", "Average Memory (MB)", "SuccDownloads", "Indexed"])
+        writer.writerow(["SizeLabel", "Metric", "Total Time (s)", "Average Time (s)", "Average Memory (MB)", "SuccDownloads", "Indexed", "Sleep Total (s)"])
 
     print(f"INDEX_ROOT_V2 = {INDEX_ROOT_V2}")
     print(f"DATA_LAKE_V2  = {DATA_LAKE_V2}")
@@ -179,19 +192,21 @@ if __name__ == "__main__":
         size_label = f"{ID_START}-{end_id} (n={size_n})"
         print(f"\n=== Benchmark for size: {size_label} ===")
 
-        # 1) Download
-        ok_ids, dl_times, dl_mems, dl_wall_total = _download_range_only(
-            ID_START, end_id, throttle=DOWNLOAD_THROTTLE_SEC
+        # 1) Download – EXKL. Pausen in allen Kennzahlen
+        ok_ids, dl_times, dl_mems, dl_sleep_total = _download_range_only(
+            ID_START, end_id,
+            throttle=DOWNLOAD_THROTTLE_SEC,
+            jitter_pct=DOWNLOAD_THROTTLE_JITTER_PCT
         )
-        dl_total = dl_wall_total
+        dl_total = sum(dl_times)                                # ohne Pausen!
         dl_avg_time = statistics.mean(dl_times) if dl_times else 0.0
-        dl_avg_mem  = statistics.mean(dl_mems) if dl_mems else 0.0
+        dl_avg_mem  = statistics.mean(dl_mems)  if dl_mems  else 0.0
 
         # 2) Index
         if ok_ids:
             indexed_ids, idx_times, idx_mems, idx_total = _index_ids(ok_ids)
             idx_avg_time = statistics.mean(idx_times) if idx_times else 0.0
-            idx_avg_mem  = statistics.mean(idx_mems) if idx_mems else 0.0
+            idx_avg_mem  = statistics.mean(idx_mems)  if idx_mems  else 0.0
         else:
             indexed_ids, idx_times, idx_mems, idx_total = [], [], [], 0.0
             idx_avg_time = 0.0
@@ -208,7 +223,7 @@ if __name__ == "__main__":
         print(header)
         print("-" * len(header))
 
-        # Download
+        # Download (alle Werte exklusiv Pausen)
         print(f"{'Download (all)':36} {_fmt(dl_total, prec=3)} {_fmt(dl_avg_time)} {_fmt(dl_avg_mem, prec=2)}")
         # Index
         print(f"{'Index (all)':36} {_fmt(idx_total, prec=3)} {_fmt(idx_avg_time)} {_fmt(idx_avg_mem, prec=2)}")
@@ -221,20 +236,25 @@ if __name__ == "__main__":
         # Search overall
         print(f"{'Search – overall (all runs)':36} {_fmt(search_overall_total)} {_fmt(search_overall_avg)} {_fmt(search_overall_mem, prec=2)}")
 
-        # 5) CSV anhängen
+        # 5) CSV anhängen (Sleep-Zeit nur informativ)
         with open(CSV_PATH, "a", newline="", encoding="utf-8") as fcsv:
             writer = csv.writer(fcsv)
             # Download/Index
-            writer.writerow([size_label, "Download (all)", f"{dl_total:.6f}", f"{dl_avg_time:.6f}", f"{dl_avg_mem:.2f}", f"{len(ok_ids)}", f"{len(indexed_ids)}"])
-            writer.writerow([size_label, "Index (all)",    f"{idx_total:.6f}", f"{idx_avg_time:.6f}", f"{idx_avg_mem:.2f}", f"{len(ok_ids)}", f"{len(indexed_ids)}"])
+            writer.writerow([size_label, "Download (all)", f"{dl_total:.6f}", f"{dl_avg_time:.6f}", f"{dl_avg_mem:.2f}", f"{len(ok_ids)}", f"{len(indexed_ids)}", f"{dl_sleep_total:.3f}"])
+            writer.writerow([size_label, "Index (all)",    f"{idx_total:.6f}", f"{idx_avg_time:.6f}", f"{idx_avg_mem:.2f}", f"{len(ok_ids)}", f"{len(indexed_ids)}", f"0.000"])
             # Search per term
             for s in per_term_stats:
                 writer.writerow([size_label, f"Search – {s['term']} ({SEARCH_RUNS_PER_TERM} runs)",
                                  f"{s['total_time']:.6f}", f"{s['avg_time']:.6f}", f"{s['avg_mem']:.2f}",
-                                 f"{len(ok_ids)}", f"{len(indexed_ids)}"])
+                                 f"{len(ok_ids)}", f"{len(indexed_ids)}", f"0.000"])
             # Search overall
             writer.writerow([size_label, "Search – overall (all runs)",
                              f"{search_overall_total:.6f}", f"{search_overall_avg:.6f}", f"{search_overall_mem:.2f}",
-                             f"{len(ok_ids)}", f"{len(indexed_ids)}"])
+                             f"{len(ok_ids)}", f"{len(indexed_ids)}", f"0.000"])
+
+        # Hinweis zur Pause (nur Info, nicht in Metriken enthalten)
+        if DOWNLOAD_THROTTLE_SEC > 0:
+            print(f"\n[Info] Total throttle sleep excluded from metrics: {dl_sleep_total:.3f}s "
+                  f"(base={DOWNLOAD_THROTTLE_SEC:.2f}s, jitter=±{int(DOWNLOAD_THROTTLE_JITTER_PCT*100)}%)")
 
     print(f"\nCSV gespeichert unter: {CSV_PATH.resolve()}")
