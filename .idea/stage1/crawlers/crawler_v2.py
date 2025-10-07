@@ -5,24 +5,26 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 BASE_URL = "https://www.gutenberg.org/cache/epub/{id}/pg{id}.txt"
-RAW_V2_DIR = Path("data_repository/datalake_v2")
+
+# --- Pfade robust relativ zum Repo (/stage1) auflösen ---
+BASE_DIR = Path(__file__).resolve().parents[1]  # .../stage1
+RAW_V2_DIR = BASE_DIR / "data_repository" / "datalake_v2"
 
 START_MARKER = "*** START OF THE PROJECT GUTENBERG EBOOK"
 END_MARKER = "*** END OF THE PROJECT GUTENBERG EBOOK"
 
 def get_with_retries(url, retries=3, backoff=1):
-    """Helper to fetch URLs with retry and timeout logic."""
+    """Helper to fetch URLs with Retry und Timeout."""
     session = requests.Session()
     retry = Retry(
         total=retries,
         backoff_factor=backoff,
         status_forcelist=[500, 502, 503, 504],
-        allowed_methods=["GET"]
+        allowed_methods=["GET"],  # bei älterem urllib3 ggf. method_whitelist verwenden
     )
     adapter = HTTPAdapter(max_retries=retry)
     session.mount("http://", adapter)
     session.mount("https://", adapter)
-
     try:
         response = session.get(url, timeout=10)
         response.raise_for_status()
@@ -33,35 +35,29 @@ def get_with_retries(url, retries=3, backoff=1):
 
 def get_subfolder(book_id: int) -> Path:
     """
-    Calculate the subfolder for a book ID.
-    Example: book_id=76343 -> subfolder '76001-77000'
+    Berechnet die ID-Range-Unterordner, z.B. 76343 -> '76001-77000'.
     """
     lower = ((book_id - 1) // 1000) * 1000 + 1
     upper = lower + 999
     return RAW_V2_DIR / f"{lower}-{upper}"
 
-
 def split_gutenberg_text(text: str, book_id: int):
     """
-    Split a Gutenberg text into header, content, footer sections.
-    Returns tuple: (header, content, footer)
+    Teilt den Gutenberg-Text in (header, content, footer).
     """
     if START_MARKER not in text or END_MARKER not in text:
         print(f"Book {book_id} missing expected START/END markers.")
         return text.strip(), "", ""
-
     header, body_and_footer = text.split(START_MARKER, 1)
     content, footer = body_and_footer.split(END_MARKER, 1)
     return header.strip(), content.strip(), footer.strip()
 
-
-def download_book_v2(book_id: int):
-    """Download a Gutenberg book and save header, content, and footer as separate TXT files."""
+def download_book_v2(book_id: int) -> bool:
+    """Lädt ein Buch und speichert header/content/footer als separate .txt unter datalake_v2."""
     url = BASE_URL.format(id=book_id)
     response = get_with_retries(url)
     if response is None:
         return False
-
 
     if response.status_code != 200:
         print(f"Failed to download book {book_id}: HTTP {response.status_code}")
@@ -69,24 +65,12 @@ def download_book_v2(book_id: int):
 
     header, content, footer = split_gutenberg_text(response.text, book_id)
 
-    # Prepare subfolder based on ID range
     subfolder = get_subfolder(book_id)
     subfolder.mkdir(parents=True, exist_ok=True)
 
-    # Save header
-    header_path = subfolder / f"{book_id}_header.txt"
-    with open(header_path, "w", encoding="utf-8") as f:
-        f.write(header)
-
-    # Save content
-    content_path = subfolder / f"{book_id}_content.txt"
-    with open(content_path, "w", encoding="utf-8") as f:
-        f.write(content)
-
-    # Save footer
-    footer_path = subfolder / f"{book_id}_footer.txt"
-    with open(footer_path, "w", encoding="utf-8") as f:
-        f.write(footer)
+    (subfolder / f"{book_id}_header.txt").write_text(header, encoding="utf-8")
+    (subfolder / f"{book_id}_content.txt").write_text(content, encoding="utf-8")
+    (subfolder / f"{book_id}_footer.txt").write_text(footer, encoding="utf-8")
 
     print(f"Book {book_id} saved as 3 files in {subfolder}")
     return True

@@ -9,7 +9,7 @@ from typing import List, Dict
 
 from memory_profiler import memory_usage
 
-from crawler_v2 import download_book_v2
+from crawlers.crawler_v2 import download_book_v2
 from Hierarchical_Indext import (
     index_book_incremental,
     search_postings,
@@ -18,7 +18,8 @@ from Hierarchical_Indext import (
 from Hierarchical_Indext.indexer_v2 import INDEX_ROOT_V2, DATA_LAKE_V2
 
 ID_START = 70000
-END_IDS = [70009, 70024, 70049, 70074, 70099]
+END_IDS = [70009]
+#, 70024, 70049, 70074, 70099]
 
 TERMS = ["advantage", "house", "white"]
 
@@ -27,7 +28,7 @@ DOWNLOAD_THROTTLE_SEC = 0.20      # 0.0 = ohne Pause
 DOWNLOAD_THROTTLE_JITTER_PCT = 0.2  # ±20% Zufallsjitter auf die Pause
 
 SEARCH_RUNS_PER_TERM  = 20     # 20 Kaltruns je Wort
-CSV_PATH = Path("stage1_benchmark_results.csv")
+CSV_PATH = Path("../stage1_benchmark_results.csv")
 
 
 # ---------- Utilities ----------
