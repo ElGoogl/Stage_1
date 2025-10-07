@@ -1,4 +1,5 @@
 import shutil
+import os
 from pathlib import Path
 
 # Base paths (adjust if needed)
@@ -49,6 +50,17 @@ def cleanup_project(confirm: bool = True):
     safe_rmfile(INDEXED_LIST)
 
     print("Cleanup complete — project state has been reset.")
+
+def delete_indexed_file(path="data_repository/datamart_indexer_v1/inverted_index.json"):
+    """
+    Deletes the indexed JSON file if it exists.
+    """
+    index_path = Path(path)
+    if index_path.exists():
+        os.remove(index_path)
+        print(f"Deleted indexed file: {index_path}")
+    else:
+        print(f"No indexed file found at: {index_path}")
 
 if __name__ == "__main__":
     cleanup_project()

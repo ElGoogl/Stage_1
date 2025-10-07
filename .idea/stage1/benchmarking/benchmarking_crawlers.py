@@ -7,18 +7,6 @@ from crawlers.crawler_v2 import download_book_v2
 from indexed_query.indexed_query_v1 import search_file_v1
 
 
-# Generic benchmarking helper
-def benchmark_function(func, *args, runs=1, **kwargs):
-    """Run a function multiple times and return average time + memory."""
-    times, memories = [], []
-    for _ in range(runs):
-        start = time.perf_counter()
-        mem_usage = memory_usage((func, args, kwargs))
-        end = time.perf_counter()
-        times.append(end - start)
-        memories.append(max(mem_usage))
-    return statistics.mean(times), statistics.mean(memories)
-
 
 # Crawler benchmark runner
 def benchmark_crawler(func, label, n_books, runs):
@@ -54,23 +42,20 @@ def benchmark_crawler(func, label, n_books, runs):
 def run_all_benchmarks():
     results = []
 
-    #results.append(benchmark_crawler(download_book_v1, "Crawler_v1 – 10 × 1 book", n_books=1, runs=10))
-    #results.append(benchmark_crawler(download_book_v2, "Crawler_v2 – 10 × 1 book", n_books=1, runs=10))
-#
-    #results.append(benchmark_crawler(download_book_v1, "Crawler_v1 – 5 × 5 books", n_books=5, runs=5))
-    #results.append(benchmark_crawler(download_book_v2, "Crawler_v2 – 5 × 5 books", n_books=5, runs=5))
-#
-    #results.append(benchmark_crawler(download_book_v1, "Crawler_v1 – 2 × 50 books", n_books=50, runs=2))
-    #results.append(benchmark_crawler(download_book_v2, "Crawler_v2 – 2 × 50 books", n_books=50, runs=2))
-#
-    #results.append(benchmark_crawler(download_book_v1, "Crawler_v1 – 1 × 75 books", n_books=75, runs=1))
-    #results.append(benchmark_crawler(download_book_v2, "Crawler_v2 – 1 × 75 books", n_books=75, runs=1))
-#
-    #results.append(benchmark_crawler(download_book_v1, "Crawler_v1 – 1 × 100 books", n_books=100, runs=1))
-    #results.append(benchmark_crawler(download_book_v2, "Crawler_v2 – 1 × 100 books", n_books=100, runs=1))
+    results.append(benchmark_crawler(download_book_v1, "Crawler_v1 – 10 × 1 book", n_books=1, runs=10))
+    results.append(benchmark_crawler(download_book_v2, "Crawler_v2 – 10 × 1 book", n_books=1, runs=10))
 
-    t, m = benchmark_function(search_file_v1, 'balls')
-    results.append(("Search (term='balls')", t, m))
+    results.append(benchmark_crawler(download_book_v1, "Crawler_v1 – 5 × 5 books", n_books=5, runs=5))
+    results.append(benchmark_crawler(download_book_v2, "Crawler_v2 – 5 × 5 books", n_books=5, runs=5))
+
+    results.append(benchmark_crawler(download_book_v1, "Crawler_v1 – 2 × 50 books", n_books=50, runs=2))
+    results.append(benchmark_crawler(download_book_v2, "Crawler_v2 – 2 × 50 books", n_books=50, runs=2))
+
+    results.append(benchmark_crawler(download_book_v1, "Crawler_v1 – 1 × 75 books", n_books=75, runs=1))
+    results.append(benchmark_crawler(download_book_v2, "Crawler_v2 – 1 × 75 books", n_books=75, runs=1))
+
+    results.append(benchmark_crawler(download_book_v1, "Crawler_v1 – 1 × 100 books", n_books=100, runs=1))
+    results.append(benchmark_crawler(download_book_v2, "Crawler_v2 – 1 × 100 books", n_books=100, runs=1))
 
 
     return results
