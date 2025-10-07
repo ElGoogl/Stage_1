@@ -15,9 +15,6 @@ It includes:
 
 ```
 
-## 📦 Project Overview
-
-
 stage1/
 │
 ├── crawlers/
@@ -49,9 +46,9 @@ stage1/
 ├── Main.py                   # Optional entry point
 └── README.md
 
-'''
+````
 
- 🧰 Requirements
+## 🧰 Requirements
 
 ### 🐍 Python
 **Python 3.10 or later** is required (tested with Python 3.13).  
