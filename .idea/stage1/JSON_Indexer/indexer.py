@@ -83,3 +83,60 @@ def save_index(index):
         json.dump(index, f, ensure_ascii=False, indent=2)
 
     print(f"💾 Inverted index saved to {filepath}")
+
+
+def load_existing_index():
+    """Lädt den existierenden Inverted Index, falls vorhanden."""
+    filepath = os.path.join(INDEX_DIR, "inverted_index.json")
+    
+    if os.path.exists(filepath):
+        with open(filepath, "r", encoding="utf-8") as f:
+            loaded_index = json.load(f)
+        # Convert back to defaultdict with sets
+        inverted_index = defaultdict(set)
+        for term, doc_ids in loaded_index.items():
+            inverted_index[term] = set(doc_ids)
+        return inverted_index
+    else:
+        return defaultdict(set)
+
+
+def index_book_incremental(book_id: int):
+    """Indexiert ein einzelnes Buch inkrementell und aktualisiert den existierenden Index."""
+    print(f"🔍 Incremental indexing for book {book_id}...")
+    
+    # Load existing index
+    inverted_index = load_existing_index()
+    
+    # Process only the specific book
+    json_filename = f"{book_id}.json"
+    filepath = os.path.join(RAW_DIR, json_filename)
+    
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f"Book {book_id} JSON file not found: {filepath}")
+    
+    # Read and index the book
+    with open(filepath, "r", encoding="utf-8") as f:
+        doc = json.load(f)
+    
+    doc_id = str(doc["id"])
+    content = doc.get("content", "")
+    
+    print(f"   → Indexing book ID {doc_id} ({json_filename})")
+    
+    # Remove old entries for this document (in case of re-indexing)
+    for term in list(inverted_index.keys()):
+        inverted_index[term].discard(doc_id)
+        if not inverted_index[term]:  # Remove empty sets
+            del inverted_index[term]
+    
+    # Tokenize and add to index
+    tokens = tokenize(content)
+    for token in tokens:
+        inverted_index[token].add(doc_id)
+    
+    # Convert to serializable format and save
+    serializable_index = {k: list(v) for k, v in inverted_index.items()}
+    save_index(serializable_index)
+    
+    print(f"   ✓ Book {book_id} incrementally added to inverted index")
